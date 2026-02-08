@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import Response
 from PIL import Image
+from rembg import remove
 import io
 
 app = FastAPI()
@@ -12,15 +13,13 @@ def root():
 @app.post("/remove-background")
 async def remove_background(file: UploadFile = File(...)):
     # Lire l'image envoyée
-    image_bytes = await file.read()
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+    input_bytes = await file.read()
 
-    # (pour l'instant) on ne fait rien sur l'image
-    buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
-    buffer.seek(0)
+    # Détourage avec rembg (U²-Net)
+    output_bytes = remove(input_bytes)
 
+    # Retourner l'image PNG détourée
     return Response(
-        content=buffer.getvalue(),
+        content=output_bytes,
         media_type="image/png"
     )
