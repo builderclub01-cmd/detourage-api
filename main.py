@@ -1,13 +1,20 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from rembg import remove
+from rembg import remove, new_session
 from PIL import Image
 import io
 
 app = FastAPI(title="Detourage API")
 
+# -------------------------------------------------
+# Préchargement du modèle (CRUCIAL pour Render)
+# -------------------------------------------------
+session = new_session("u2net")
+
+# -------------------------------------------------
 # CORS (OK large pour tests)
+# -------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,6 +22,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# -------------------------------------------------
+# Routes
+# -------------------------------------------------
 @app.get("/")
 def root():
     return {"status": "ok", "message": "API de détourage en ligne"}
@@ -25,11 +35,11 @@ async def remove_background(file: UploadFile = File(...)):
         # Lire le fichier uploadé
         input_bytes = await file.read()
 
-        # Convertir en image PIL (OBLIGATOIRE)
+        # Convertir en image PIL
         input_image = Image.open(io.BytesIO(input_bytes)).convert("RGBA")
 
-        # Détourage avec rembg
-        output_image = remove(input_image)
+        # Détourage avec session préchargée
+        output_image = remove(input_image, session=session)
 
         # Reconvertir en PNG bytes
         output_buffer = io.BytesIO()
