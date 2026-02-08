@@ -1,23 +1,20 @@
-from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import Response, JSONResponse
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from rembg import remove
+from PIL import Image
+import io
 
 app = FastAPI(title="Detourage API")
 
-# --------------------
-# CORS (obligatoire pour le frontend)
-# --------------------
+# CORS (OK pour tests frontend)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # autorise tous les frontends (OK pour maintenant)
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --------------------
-# Routes
-# --------------------
 @app.get("/")
 def root():
     return {"status": "ok", "message": "API de détourage en ligne"}
@@ -25,21 +22,24 @@ def root():
 @app.post("/remove-background")
 async def remove_background(file: UploadFile = File(...)):
     try:
-        # Lire l'image envoyée
+        # Lire le fichier uploadé
         input_bytes = await file.read()
 
-        # Détourage IA (rembg / U²-Net)
-        output_bytes = remove(input_bytes)
+        # Charger l'image avec Pillow
+        image = Image.open(io.BytesIO(input_bytes)).convert("RGBA")
 
-        # Retourner l'image PNG détourée
+        # Supprimer l’arrière-plan (IMPORTANT : Image PIL)
+        result_image = remove(image)
+
+        # Convertir en PNG
+        output_buffer = io.BytesIO()
+        result_image.save(output_buffer, format="PNG")
+        output_buffer.seek(0)
+
         return Response(
-            content=output_bytes,
+            content=output_buffer.read(),
             media_type="image/png"
         )
 
     except Exception as e:
-        # Sécurité : éviter un crash silencieux
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
+        raise HTTPException(status_code=500, detail=str(e))
