@@ -1,19 +1,22 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
-from rembg import remove
+from rembg import remove, new_session
 from PIL import Image
 import io
 
 app = FastAPI(title="Detourage API")
 
-# CORS (OK pour tests frontend)
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ⚠️ SESSION REMBG CRÉÉE UNE SEULE FOIS
+session = new_session("u2net")
 
 @app.get("/")
 def root():
@@ -22,22 +25,19 @@ def root():
 @app.post("/remove-background")
 async def remove_background(file: UploadFile = File(...)):
     try:
-        # Lire le fichier uploadé
         input_bytes = await file.read()
 
-        # Charger l'image avec Pillow
         image = Image.open(io.BytesIO(input_bytes)).convert("RGBA")
 
-        # Supprimer l’arrière-plan (IMPORTANT : Image PIL)
-        result_image = remove(image)
+        # 👇 utilisation de la session
+        result = remove(image, session=session)
 
-        # Convertir en PNG
-        output_buffer = io.BytesIO()
-        result_image.save(output_buffer, format="PNG")
-        output_buffer.seek(0)
+        output = io.BytesIO()
+        result.save(output, format="PNG")
+        output.seek(0)
 
         return Response(
-            content=output_buffer.read(),
+            content=output.read(),
             media_type="image/png"
         )
 
